@@ -60,3 +60,55 @@ resource "aws_instance" "minecraft_server" {
     Name = "Mincraft Server"
   }
 }
+
+# resource "aws_iam_role_policy" "minecraft_server_toggle_policy" {
+#   name = "minecraft-server-toggle-policy"
+#   role = aws_iam_role.minecraft_server_lambda_toggle
+
+#   policy = jsoncode({
+#     Statement : [
+#       {
+#         Effect : "Allow",
+#         Action : [
+#           "ec2:StartInstances",
+#           "ec2:StopInstances"
+#         ],
+#         Resource : [
+#           "arn:aws:ec2:*:531238205865:instance/*",
+#           "arn:aws:license-manager:*:531238205865:license-configuration/*"
+#         ]
+#       },
+#     ]
+#   })
+# }
+
+data "aws_iam_policy_document" "instance_toggle_role_policy" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "ec2:StartInstances",
+      "ec2:StopInstances"
+    ]
+    resources = ["*"]
+  }
+}
+
+resource "aws_iam_role" "minecraft_server_lambda_toggle" {
+  name               = "minecraft-server-lambda-toggle"
+  assume_role_policy = data.aws_iam_policy_document.instance_toggle_role_policy.json
+}
+
+resource "aws_lambda_function" "mincraft_server_toggle" {
+  function_name = "lambda_minecraft_server_toggle"
+  role          = aws_iam_role.minecraft_server_lambda_toggle.arn
+  handler       = "app.py"
+  runtime       = "python3.9"
+}
+
+resource "aws_cloudwatch_event_rule" "toggle_event_rule" {
+  name        = "toggle-event-rule"
+  description = "Runs lambda to toggle on and off Minecraft server"
+
+  schedule_expression = "cron(0 8 * * ? *)"
+}
+
